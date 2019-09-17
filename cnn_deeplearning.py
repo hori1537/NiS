@@ -1,31 +1,36 @@
 
-
+#© 2019 Horie Yuki
 #from tensorflow.python.client import device_lib
 #device_lib.list_local_devices()
 
 #print(device_lib.list_local_devices())
 
 # coding: UTF-8
+import keras.models
 from keras.models import Model
-from keras.layers import Dense, GlobalAveragePooling2D,Input
+from keras.models import Sequential
+
+#from keras.models import model_from_json
+
+from keras.layers import Dense, Input, Activation, Dropout, Flatten
+from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
+from keras.layers import MaxPool2D #MAxPool2D equal MaxPooling2D
+
 from keras.applications.vgg16 import VGG16
 from keras.applications.inception_v3 import InceptionV3
 from keras.applications.inception_resnet_v2 import InceptionResNetV2
 from keras.applications.mobilenet import MobileNet
 from keras.applications.xception import Xception
 from keras.preprocessing.image import ImageDataGenerator
+from keras.preprocessing.image import img_to_array, load_img
+
 from keras.optimizers import Adam, RMSprop, SGD
 from keras.callbacks import CSVLogger
+from keras.callbacks import ModelCheckpoint
 
-from keras.models import model_from_json
 import matplotlib.pyplot as plt
 import numpy as np
-import os,random
-from keras.preprocessing.image import img_to_array, load_img
-import os
-import keras.models
-
-from keras.callbacks import ModelCheckpoint
+import os, random
 
 
 def chk_mkdir(paths):
@@ -37,6 +42,8 @@ def chk_mkdir(paths):
 
 
 batch_size=32
+input_image_size = 224
+
 base_dir        =r'C:\Users\3ken\Desktop\data_science\pictures\actors'
 #base_dir        =r'drive/My Drive/actors'
 theme_name      = os.path.basename(os.path.dirname(base_dir))
@@ -51,7 +58,6 @@ paths = [base_dir + os.sep + 'model',
          base_dir + os.sep + 'best_model',
          base_dir + os.sep + 'model'+ os.sep + 'checkpoint',
          base_dir + os.sep + 'model'+ os.sep + 'csvlogger',
-         
             ]
 
 chk_mkdir(paths)
@@ -67,6 +73,29 @@ net_type = 'xception'
 #net_type = 'mobilenet'
 
 file_name = net_type +'_'  + theme_name +'_category_' + str(n_categories) + '_' + str(n_epochs) + 'eps_'
+
+def create_original_model():
+
+    model = Sequential() # model = keras.models.Sequential()と等価
+
+    model.add(Conv2D(32,3,input_shape=(input_image_size,input_image_size,3)))
+    model.add(Activation('relu'))
+    model.add(Conv2D(32,3))
+    model.add(Activation('relu'))
+    model.add(MaxPool2D(pool_size=(2,2)))
+
+    model.add(Conv2D(64,3))
+    model.add(Activation('relu'))
+    model.add(MaxPool2D(pool_size=(2,2)))
+
+    model.add(Flatten())
+    model.add(Dense(1024))
+    model.add(Activation('relu'))
+    model.add(Dropout(1.0))
+
+    model.add(Dense(n_categories, activation='softmax'))
+
+    return model
 
 def create_xception():
     base_model = Xception(
@@ -161,14 +190,14 @@ def create_vgg16():
 
     return model
 
-
-
-
-
 if net_type == 'xception':
     model = create_xception()
 elif net_type == 'mobilenet':
     model = create_mobilenet()
+elif net_type == 'original':
+    model = create_original_model()
+elif net_type == 'vgg16':
+    model = create_vgg16()
 else:
     model = create_vgg16()
 
@@ -199,7 +228,7 @@ validation_datagen=ImageDataGenerator(rescale=1.0/255)
 
 train_generator=train_datagen.flow_from_directory(
     train_dir,
-    target_size=(224,224),
+    target_size=(input_image_size,input_image_size),
     batch_size=batch_size,
     class_mode='categorical',
     shuffle=True
@@ -207,7 +236,7 @@ train_generator=train_datagen.flow_from_directory(
 
 validation_generator=validation_datagen.flow_from_directory(
     validation_dir,
-    target_size=(224,224),
+    target_size=(input_image_size,input_image_size),
     batch_size=batch_size,
     class_mode='categorical',
     shuffle=True
@@ -254,7 +283,7 @@ test_datagen=ImageDataGenerator(
 
 test_generator=test_datagen.flow_from_directory(
     test_dir,
-    target_size=(224,224),
+    target_size=(input_image_size,input_image_size),
     batch_size=batch_size,
     class_mode='categorical',
     shuffle=True
@@ -277,13 +306,13 @@ img=random.sample(files,n_display)
 plt.figure(figsize=(10,10))
 
 for i in range(n_display):
-    temp_img=load_img(os.path.join(display_dir,img[i]),target_size=(224,224))
+    temp_img=load_img(os.path.join(display_dir,img[i]),target_size=(input_image_size,input_image_size))
     plt.subplot(5,7,i+1)
     plt.imshow(temp_img)
     #Images normalization
     temp_img_array=img_to_array(temp_img)
     temp_img_array=temp_img_array.astype('float32')/255.0
-    temp_img_array=temp_img_array.reshape((1,224,224,3))
+    temp_img_array=temp_img_array.reshape((1,input_image_size,input_image_size,3))
     #predict image
     img_pred=model.predict(temp_img_array)
     #print(str(round(max(img_pred[0]),2)))
